@@ -1,0 +1,53 @@
+{
+  "users": [
+    {
+      "id": "4b2e762f-d72b-41bf-871b-471e3cc53152",
+      "email": "admin@example.com",
+      "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+      "firstName": "Admin",
+      "lastName": "User",
+      "isAdmin": true,
+      "diamondBalance": 10000,
+      "createdAt": "2025-11-07T23:59:22.114Z",
+      "updatedAt": "2025-11-07T23:59:22.114Z"
+    },
+    {
+      "id": "28635c5b-55ea-4c33-a0ac-b2db45d724e5",
+      "email": "user@example.com",
+      "password": "e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446",
+      "firstName": "Regular",
+      "lastName": "User",
+      "isAdmin": false,
+      "diamondBalance": 5000,
+      "createdAt": "2025-11-07T23:59:22.115Z",
+      "updatedAt": "2025-11-07T23:59:22.115Z"
+    }
+  ],
+  "products": [
+    {
+      "id": "cac8e5a6-bb6e-447d-9d9d-d78b7de07016",
+      "name": "Premium Diamond Package",
+      "description": "Get 1000 bonus diamonds with this exclusive package",
+      "price": 500,
+      "imageUrl": "",
+      "createdAt": "2025-11-07T23:59:22.115Z"
+    },
+    {
+      "id": "20440be0-c1d6-4c4f-b855-2df75b5aec6d",
+      "name": "Elite Diamond Bundle",
+      "description": "The ultimate diamond bundle with premium features",
+      "price": 1000,
+      "imageUrl": "",
+      "createdAt": "2025-11-07T23:59:22.115Z"
+    },
+    {
+      "id": "7b9d2990-ea53-4ceb-a1a2-63a832e98ddd",
+      "name": "Starter Diamond Pack",
+      "description": "Perfect for beginners, includes 200 diamonds",
+      "price": 100,
+      "imageUrl": "",
+      "createdAt": "2025-11-07T23:59:22.115Z"
+    }
+  ],
+  "orders": []
+}

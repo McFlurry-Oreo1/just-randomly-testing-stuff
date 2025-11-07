@@ -11,31 +11,28 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
-import { useWebSocket } from "@/hooks/useWebSocket";
 import { DiamondBalance } from "./DiamondBalance";
 import { DiamondIcon } from "./DiamondIcon";
-import { ConnectionIndicator } from "./ConnectionIndicator";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { ShoppingBag, Package, Users, Settings, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useEffect } from "react";
-import { queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function AppSidebar() {
   const { user } = useAuth();
   const [location] = useLocation();
-  const { isConnected, lastMessage } = useWebSocket(user?.id);
 
-  // Listen for WebSocket balance updates
-  useEffect(() => {
-    if (lastMessage?.type === "balance_update" && lastMessage.userId === user?.id) {
-      queryClient.setQueryData(["/api/auth/user"], (old: any) => ({
-        ...old,
-        diamondBalance: lastMessage.newBalance,
-      }));
-    }
-  }, [lastMessage, user?.id]);
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/auth/logout", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      window.location.href = "/";
+    },
+  });
 
   const userMenuItems = [
     {
@@ -62,6 +59,13 @@ export function AppSidebar() {
       icon: Settings,
     },
   ] : [];
+
+  const getInitials = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    return user?.email?.[0]?.toUpperCase() || "U";
+  };
 
   return (
     <Sidebar>
@@ -97,7 +101,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {user?.isAdmin && adminMenuItems.length > 0 && (
+        {adminMenuItems.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -118,36 +122,37 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t space-y-3">
-        <ConnectionIndicator isConnected={isConnected} />
-        
+      <SidebarFooter className="p-4 border-t">
         {user && (
-          <div className="flex items-center gap-3 mb-2">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={user.profileImageUrl || undefined} />
-              <AvatarFallback>
-                {user.firstName?.[0] || user.email?.[0] || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {user.firstName && user.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user.email}
-              </p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 glass rounded-lg">
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={user.profileImageUrl} />
+                <AvatarFallback>{getInitials()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {user.firstName && user.lastName 
+                    ? `${user.firstName} ${user.lastName}`
+                    : user.email
+                  }
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
             </div>
+            
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              data-testid="button-logout"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              {logoutMutation.isPending ? "Signing out..." : "Sign Out"}
+            </Button>
           </div>
         )}
-
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => window.location.href = "/api/logout"}
-          data-testid="button-logout"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          Logout
-        </Button>
       </SidebarFooter>
     </Sidebar>
   );
