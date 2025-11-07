@@ -1,34 +1,119 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin, getCurrentUser } from "./auth";
 import { insertOrderSchema } from "@shared/schema";
 import { purchaseSchema, adjustDiamondsSchema } from "@shared/validation";
 import { fromZodError } from "zod-validation-error";
-import type { WebSocketBroadcast } from "./websocket";
+import { z } from "zod";
 
-// Store the broadcast function set by websocket.ts
-let broadcastFn: WebSocketBroadcast | null = null;
+// Validation schemas
+const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+});
 
-export function setBroadcastFunction(fn: WebSocketBroadcast) {
-  broadcastFn = fn;
-}
-
-function broadcastToUser(userId: string, message: any) {
-  if (broadcastFn) {
-    broadcastFn(userId, message);
-  }
-}
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
 
 export async function registerRoutes(app: Express): Promise<void> {
-  // Setup Replit Auth middleware
+  // Setup auth middleware
   await setupAuth(app);
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.post('/api/auth/signup', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const parseResult = signupSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromZodError(parseResult.error);
+        return res.status(400).json({ message: validationError.message });
+      }
+
+      const { email, password, firstName, lastName } = parseResult.data;
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Create new user
+      const user = await storage.createUser({
+        email,
+        password,
+        firstName,
+        lastName,
+        isAdmin: false,
+        diamondBalance: 1000, // Starting balance
+      });
+
+      // Set session
+      (req.session as any).userId = user.id;
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error during signup:", error);
+      res.status(500).json({ message: "Failed to create account" });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const parseResult = loginSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromZodError(parseResult.error);
+        return res.status(400).json({ message: validationError.message });
+      }
+
+      const { email, password } = parseResult.data;
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Verify password
+      if (!storage.verifyPassword(password, user.password)) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Set session
+      (req.session as any).userId = user.id;
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.status(500).json({ message: "Failed to login" });
+    }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Failed to logout" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  app.get('/api/auth/user', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -47,9 +132,12 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // Purchase route
-  app.post('/api/purchase', isAuthenticated, async (req: any, res) => {
+  app.post('/api/purchase', isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const user = await getCurrentUser(req);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
       
       // Validate request body with Zod
       const parseResult = purchaseSchema.safeParse(req.body);
@@ -60,14 +148,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const { productId } = parseResult.data;
 
-      const [user, product] = await Promise.all([
-        storage.getUser(userId),
-        storage.getProduct(productId),
-      ]);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      const product = await storage.getProduct(productId);
 
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
@@ -78,18 +159,11 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       // Deduct diamonds and create order
-      const updatedUser = await storage.adjustUserDiamonds(userId, -product.price);
+      const updatedUser = await storage.adjustUserDiamonds(user.id, -product.price);
       const order = await storage.createOrder({
-        userId,
+        userId: user.id,
         productId,
         status: "pending",
-      });
-
-      // Broadcast balance update via WebSocket
-      broadcastToUser(userId, {
-        type: "balance_update",
-        userId,
-        newBalance: updatedUser.diamondBalance,
       });
 
       res.json({ order, user: updatedUser });
@@ -100,10 +174,14 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // User orders route
-  app.get('/api/orders', isAuthenticated, async (req: any, res) => {
+  app.get('/api/orders', isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const orders = await storage.getUserOrders(userId);
+      const user = await getCurrentUser(req);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const orders = await storage.getUserOrders(user.id);
       res.json(orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -115,7 +193,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      res.json(users);
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -148,14 +228,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const user = await storage.adjustUserDiamonds(userId, amount);
 
-      // Broadcast balance update via WebSocket
-      broadcastToUser(userId, {
-        type: "balance_update",
-        userId,
-        newBalance: user.diamondBalance,
-      });
-
-      res.json(user);
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error: any) {
       console.error("Error adjusting diamonds:", error);
       res.status(500).json({ message: error.message || "Failed to adjust diamonds" });
@@ -177,26 +252,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post('/api/admin/orders/:id/complete', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const order = await storage.getOrder(id);
-
-      if (!order) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      const updatedOrder = await storage.updateOrderStatus(id, "completed");
-
-      // Broadcast order update via WebSocket
-      broadcastToUser(order.userId, {
-        type: "order_update",
-        orderId: id,
-        status: "completed",
-      });
-
-      res.json(updatedOrder);
+      const order = await storage.updateOrderStatus(id, "completed");
+      res.json(order);
     } catch (error) {
       console.error("Error completing order:", error);
       res.status(500).json({ message: "Failed to complete order" });
     }
   });
-
 }

@@ -1,7 +1,4 @@
 import {
-  users,
-  products,
-  orders,
   type User,
   type UpsertUser,
   type Product,
@@ -9,16 +6,18 @@ import {
   type Order,
   type InsertOrder,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { fileDb } from "./fileStorage";
 
 export interface IStorage {
-  // User operations (Required for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: UpsertUser): Promise<User>;
+  upsertUser(user: UpsertUser & { id?: string }): Promise<User>;
   getAllUsers(): Promise<User[]>;
   deleteUser(id: string): Promise<void>;
   adjustUserDiamonds(userId: string, amount: number): Promise<User>;
+  verifyPassword(password: string, hashedPassword: string): boolean;
   
   // Product operations
   getAllProducts(): Promise<Product[]>;
@@ -33,34 +32,43 @@ export interface IStorage {
   getOrder(id: string): Promise<any | undefined>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class FileStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    const user = await fileDb.getUserById(id);
+    return user ? this.deserializeUser(user) : undefined;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const user = await fileDb.getUserByEmail(email);
+    return user ? this.deserializeUser(user) : undefined;
+  }
+
+  async createUser(userData: UpsertUser): Promise<User> {
+    const user = await fileDb.createUser(userData);
+    return this.deserializeUser(user);
+  }
+
+  async upsertUser(userData: UpsertUser & { id?: string }): Promise<User> {
+    if (userData.id) {
+      const existing = await fileDb.getUserById(userData.id);
+      if (existing) {
+        const updated = await fileDb.updateUser(userData.id, userData);
+        return this.deserializeUser(updated);
+      }
+    }
+    
+    const user = await fileDb.createUser(userData);
+    return this.deserializeUser(user);
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    const users = await fileDb.getUsers();
+    return users.map(u => this.deserializeUser(u));
   }
 
   async deleteUser(id: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+    await fileDb.deleteUser(id);
   }
 
   async adjustUserDiamonds(userId: string, amount: number): Promise<User> {
@@ -74,83 +82,107 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Insufficient diamonds");
     }
 
-    const [updatedUser] = await db
-      .update(users)
-      .set({ diamondBalance: newBalance, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
+    const updated = await fileDb.updateUser(userId, { diamondBalance: newBalance });
+    return this.deserializeUser(updated);
+  }
 
-    return updatedUser;
+  verifyPassword(password: string, hashedPassword: string): boolean {
+    return fileDb.verifyPassword(password, hashedPassword);
   }
 
   // Product operations
   async getAllProducts(): Promise<Product[]> {
-    return await db.select().from(products).orderBy(desc(products.createdAt));
+    const products = await fileDb.getProducts();
+    return products.map(p => this.deserializeProduct(p));
   }
 
   async getProduct(id: string): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.id, id));
-    return product;
+    const product = await fileDb.getProductById(id);
+    return product ? this.deserializeProduct(product) : undefined;
   }
 
   async createProduct(productData: InsertProduct): Promise<Product> {
-    const [product] = await db.insert(products).values(productData).returning();
-    return product;
+    const product = await fileDb.createProduct(productData);
+    return this.deserializeProduct(product);
   }
 
   // Order operations
   async createOrder(orderData: InsertOrder): Promise<Order> {
-    const [order] = await db.insert(orders).values(orderData).returning();
-    return order;
+    const order = await fileDb.createOrder(orderData);
+    return this.deserializeOrder(order);
   }
 
   async getUserOrders(userId: string): Promise<any[]> {
-    const userOrders = await db.query.orders.findMany({
-      where: eq(orders.userId, userId),
-      with: {
-        product: true,
-      },
-      orderBy: desc(orders.createdAt),
-    });
-    return userOrders;
+    const orders = await fileDb.getOrdersByUserId(userId);
+    return Promise.all(orders.map(async (order: any) => {
+      const product = await fileDb.getProductById(order.productId);
+      return {
+        ...this.deserializeOrder(order),
+        product: product ? this.deserializeProduct(product) : null,
+      };
+    }));
   }
 
   async getAllOrders(): Promise<any[]> {
-    const allOrders = await db.query.orders.findMany({
-      with: {
-        product: true,
-        user: true,
-      },
-      orderBy: desc(orders.createdAt),
-    });
-    return allOrders;
+    const orders = await fileDb.getOrders();
+    return Promise.all(orders.map(async (order: any) => {
+      const product = await fileDb.getProductById(order.productId);
+      const user = await fileDb.getUserById(order.userId);
+      return {
+        ...this.deserializeOrder(order),
+        product: product ? this.deserializeProduct(product) : null,
+        user: user ? this.deserializeUser(user) : null,
+      };
+    }));
   }
 
   async updateOrderStatus(orderId: string, status: string): Promise<Order> {
     const updateData: any = { status };
     if (status === "completed") {
-      updateData.completedAt = new Date();
+      updateData.completedAt = new Date().toISOString();
     }
 
-    const [order] = await db
-      .update(orders)
-      .set(updateData)
-      .where(eq(orders.id, orderId))
-      .returning();
-
-    return order;
+    const order = await fileDb.updateOrder(orderId, updateData);
+    return this.deserializeOrder(order);
   }
 
   async getOrder(id: string): Promise<any | undefined> {
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, id),
-      with: {
-        product: true,
-        user: true,
-      },
-    });
-    return order;
+    const order = await fileDb.getOrderById(id);
+    if (!order) return undefined;
+
+    const product = await fileDb.getProductById(order.productId);
+    const user = await fileDb.getUserById(order.userId);
+    
+    return {
+      ...this.deserializeOrder(order),
+      product: product ? this.deserializeProduct(product) : null,
+      user: user ? this.deserializeUser(user) : null,
+    };
+  }
+
+  // Helper methods to convert string dates back to Date objects
+  private deserializeUser(user: any): User {
+    return {
+      ...user,
+      createdAt: new Date(user.createdAt),
+      updatedAt: new Date(user.updatedAt),
+    };
+  }
+
+  private deserializeProduct(product: any): Product {
+    return {
+      ...product,
+      createdAt: new Date(product.createdAt),
+    };
+  }
+
+  private deserializeOrder(order: any): Order {
+    return {
+      ...order,
+      createdAt: new Date(order.createdAt),
+      completedAt: order.completedAt ? new Date(order.completedAt) : undefined,
+    };
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new FileStorage();

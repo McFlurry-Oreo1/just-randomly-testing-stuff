@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { setupWebSocketServer } from "./websocket";
+import { fileDb } from "./fileStorage";
 
 const app = express();
 
@@ -49,10 +49,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize file database
+  await fileDb.init();
+  log("File database initialized");
+
   // Create HTTP server first
   const server = createServer(app);
 
-  // Register API routes (no longer returns server)
+  // Register API routes
   await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -71,9 +75,6 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
-
-  // Setup WebSocket server AFTER Vite to bypass Express middleware
-  setupWebSocketServer(server);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
