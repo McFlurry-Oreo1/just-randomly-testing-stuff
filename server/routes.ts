@@ -1,28 +1,25 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 import { insertOrderSchema } from "@shared/schema";
 import { purchaseSchema, adjustDiamondsSchema } from "@shared/validation";
 import { fromZodError } from "zod-validation-error";
+import type { WebSocketBroadcast } from "./websocket";
 
-// WebSocket client tracking
-const clients = new Map<string, Set<WebSocket>>();
+// Store the broadcast function set by websocket.ts
+let broadcastFn: WebSocketBroadcast | null = null;
+
+export function setBroadcastFunction(fn: WebSocketBroadcast) {
+  broadcastFn = fn;
+}
 
 function broadcastToUser(userId: string, message: any) {
-  const userClients = clients.get(userId);
-  if (userClients) {
-    const messageStr = JSON.stringify(message);
-    userClients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(messageStr);
-      }
-    });
+  if (broadcastFn) {
+    broadcastFn(userId, message);
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   // Setup Replit Auth middleware
   await setupAuth(app);
 
@@ -202,49 +199,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-
-  // WebSocket server setup (at /ws path to avoid conflicts with Vite HMR)
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-
-  wss.on('connection', (ws: WebSocket) => {
-    let userId: string | null = null;
-
-    ws.on('message', (data: Buffer) => {
-      try {
-        const message = JSON.parse(data.toString());
-        
-        if (message.type === 'register' && message.userId) {
-          userId = message.userId;
-          
-          if (!clients.has(userId)) {
-            clients.set(userId, new Set());
-          }
-          clients.get(userId)!.add(ws);
-
-          ws.send(JSON.stringify({ type: 'registered', userId }));
-        }
-      } catch (error) {
-        console.error('WebSocket message error:', error);
-      }
-    });
-
-    ws.on('close', () => {
-      if (userId) {
-        const userClients = clients.get(userId);
-        if (userClients) {
-          userClients.delete(ws);
-          if (userClients.size === 0) {
-            clients.delete(userId);
-          }
-        }
-      }
-    });
-
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-    });
-  });
-
-  return httpServer;
 }
