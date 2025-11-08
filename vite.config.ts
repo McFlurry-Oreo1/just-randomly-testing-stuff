@@ -21,6 +21,14 @@ export default defineConfig({
   ],
   define: {
     global: 'globalThis',
+    'process.env': {},
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
   },
   resolve: {
     alias: {
