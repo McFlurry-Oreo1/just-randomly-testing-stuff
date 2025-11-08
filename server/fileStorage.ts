@@ -179,6 +179,23 @@ class FileDatabase {
     return product;
   }
 
+  async updateProduct(id: string, updates: any) {
+    const index = this.data.products.findIndex(p => p.id === id);
+    if (index === -1) throw new Error("Product not found");
+    
+    this.data.products[index] = {
+      ...this.data.products[index],
+      ...updates,
+    };
+    await this.save();
+    return this.data.products[index];
+  }
+
+  async deleteProduct(id: string) {
+    this.data.products = this.data.products.filter(p => p.id !== id);
+    await this.save();
+  }
+
   // Order operations
   async getOrders() {
     return this.data.orders;

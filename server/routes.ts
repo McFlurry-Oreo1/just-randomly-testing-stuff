@@ -131,6 +131,65 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Admin: Create product
+  app.post('/api/admin/products', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { name, description, price, imageUrl } = req.body;
+      
+      if (!name || !price || price <= 0) {
+        return res.status(400).json({ message: "Name and valid price are required" });
+      }
+
+      const product = await storage.createProduct({
+        name,
+        description: description || "",
+        price: parseInt(price),
+        imageUrl: imageUrl || "",
+      });
+
+      res.json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      res.status(500).json({ message: "Failed to create product" });
+    }
+  });
+
+  // Admin: Update product
+  app.put('/api/admin/products/:id', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, price, imageUrl } = req.body;
+      
+      if (!name || !price || price <= 0) {
+        return res.status(400).json({ message: "Name and valid price are required" });
+      }
+
+      const product = await storage.updateProduct(id, {
+        name,
+        description: description || "",
+        price: parseInt(price),
+        imageUrl: imageUrl || "",
+      });
+
+      res.json(product);
+    } catch (error: any) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ message: error.message || "Failed to update product" });
+    }
+  });
+
+  // Admin: Delete product
+  app.delete('/api/admin/products/:id', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProduct(id);
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
   // Purchase route
   app.post('/api/purchase', isAuthenticated, async (req, res) => {
     try {

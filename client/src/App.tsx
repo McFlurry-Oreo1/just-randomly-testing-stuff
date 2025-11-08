@@ -13,9 +13,10 @@ import Landing from "@/pages/Landing";
 import Store from "@/pages/Store";
 import Orders from "@/pages/Orders";
 import Camera from "@/pages/Camera";
-import UserManagement from "@/pages/admin/UserManagement";
-import OrderManagement from "@/pages/admin/OrderManagement";
-import CameraViewer from "@/pages/admin/CameraViewer";
+import UserManagement from "./pages/admin/UserManagement";
+import ProductManagement from "./pages/admin/ProductManagement";
+import OrderManagement from "./pages/admin/OrderManagement";
+import CameraViewer from "./pages/admin/CameraViewer";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -41,9 +42,11 @@ function Router() {
           <Route path="/" component={Store} />
           <Route path="/orders" component={Orders} />
           <Route path="/camera" component={Camera} />
-          <Route path="/admin/users" component={UserManagement} />
-          <Route path="/admin/orders" component={OrderManagement} />
-          <Route path="/admin/camera" component={CameraViewer} />
+          {/* Admin Routes */}
+          <Route path="/admin/users" element={<ProtectedRoute adminOnly><UserManagement /></ProtectedRoute>} />
+          <Route path="/admin/products" element={<ProtectedRoute adminOnly><ProductManagement /></ProtectedRoute>} />
+          <Route path="/admin/orders" element={<ProtectedRoute adminOnly><OrderManagement /></ProtectedRoute>} />
+          <Route path="/admin/camera" element={<ProtectedRoute adminOnly><CameraViewer /></ProtectedRoute>} />
         </>
       )}
       <Route component={NotFound} />

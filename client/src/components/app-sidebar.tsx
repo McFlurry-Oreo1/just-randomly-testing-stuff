@@ -15,7 +15,7 @@ import { DiamondBalance } from "./DiamondBalance";
 import { DiamondIcon } from "./DiamondIcon";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { ShoppingBag, Package, Users, Settings, LogOut, Camera } from "lucide-react";
+import { ShoppingBag, Package, Users, Settings, LogOut, Camera, ShoppingCart } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -84,7 +84,7 @@ export function AppSidebar() {
           <DiamondIcon className="w-6 h-6" withShimmer />
           <span className="text-lg font-bold gradient-text">Diamond Store</span>
         </div>
-        
+
         {user && (
           <div className="glass p-4 rounded-lg">
             <DiamondBalance balance={user.diamondBalance} size="lg" />
@@ -116,16 +116,38 @@ export function AppSidebar() {
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminMenuItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location === item.url}>
-                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/admin/users"}>
+                    <Link href="/admin/users" data-testid="link-user-management">
+                      <Users className="w-4 h-4" />
+                      <span>User Management</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/admin/products"}>
+                    <Link href="/admin/products" data-testid="link-product-management">
+                      <Package className="w-4 h-4" />
+                      <span>Product Management</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/admin/orders"}>
+                    <Link href="/admin/orders" data-testid="link-order-management">
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>Order Management</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/admin/camera"}>
+                    <Link href="/admin/camera" data-testid="link-camera-viewer">
+                      <Camera className="w-4 h-4" />
+                      <span>Camera Viewer</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -150,7 +172,7 @@ export function AppSidebar() {
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </div>
             </div>
-            
+
             <Button 
               variant="outline" 
               className="w-full" 

@@ -23,6 +23,8 @@ export interface IStorage {
   getAllProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: InsertProduct): Promise<Product>;
+  deleteProduct(id: string): Promise<void>;
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
@@ -104,6 +106,15 @@ export class FileStorage implements IStorage {
   async createProduct(productData: InsertProduct): Promise<Product> {
     const product = await fileDb.createProduct(productData);
     return this.deserializeProduct(product);
+  }
+
+  async updateProduct(id: string, productData: InsertProduct): Promise<Product> {
+    const product = await fileDb.updateProduct(id, productData);
+    return this.deserializeProduct(product);
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    await fileDb.deleteProduct(id);
   }
 
   // Order operations
