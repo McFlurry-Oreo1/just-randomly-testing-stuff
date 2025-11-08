@@ -21,6 +21,17 @@
       "diamondBalance": 5000,
       "createdAt": "2025-11-08T00:01:43.977Z",
       "updatedAt": "2025-11-08T00:01:43.977Z"
+    },
+    {
+      "id": "81718e40-77b1-402b-a7e2-9347a39c6c8b",
+      "email": "barron.samuel111@gmail.com",
+      "password": "$2b$10$zFhkimcXcAu71rzL46YpheocMtMNCM58S4aG6PCihKcjD4X8AWpd2",
+      "firstName": "Isaac",
+      "lastName": "fatty",
+      "isAdmin": false,
+      "diamondBalance": 349,
+      "createdAt": "2025-11-08T00:33:43.184Z",
+      "updatedAt": "2025-11-08T00:34:37.364Z"
     }
   ],
   "products": [
@@ -49,5 +60,14 @@
       "createdAt": "2025-11-08T00:01:43.977Z"
     }
   ],
-  "orders": []
+  "orders": [
+    {
+      "id": "17f56fcd-d232-448c-aeaf-6cdb9e2b8300",
+      "userId": "81718e40-77b1-402b-a7e2-9347a39c6c8b",
+      "productId": "b7b90a83-5c40-4cc7-a6f2-c21e0d858231",
+      "status": "completed",
+      "createdAt": "2025-11-08T00:33:49.821Z",
+      "completedAt": "2025-11-08T00:35:21.615Z"
+    }
+  ]
 }
