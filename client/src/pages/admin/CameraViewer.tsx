@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -5,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Camera, Download, Video as VideoIcon, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import JSZip from "jszip";
 
 interface CameraStream {
   userId: string;
@@ -17,26 +17,58 @@ interface CameraStream {
 interface RecordingState {
   [userId: string]: {
     isRecording: boolean;
-    frames: string[];
+    mediaRecorder: MediaRecorder | null;
+    chunks: Blob[];
     startTime: number;
-    lastTimestamp: number;
   };
 }
 
 export default function CameraViewer() {
   const { toast } = useToast();
   const [recordingState, setRecordingState] = useState<RecordingState>({});
-  const recordingIntervalsRef = useRef<{ [userId: string]: NodeJS.Timeout }>({});
+  const canvasRefs = useRef<{ [userId: string]: HTMLCanvasElement }>({});
+  const streamRefs = useRef<{ [userId: string]: MediaStream }>({});
 
   const { data: streams = [] } = useQuery<CameraStream[]>({
     queryKey: ["/api/admin/camera/streams"],
-    refetchInterval: 1000,
+    refetchInterval: 100,
   });
 
-  const latestStreamsRef = useRef<CameraStream[]>([]);
-
   useEffect(() => {
-    latestStreamsRef.current = streams;
+    streams.forEach((stream) => {
+      if (!canvasRefs.current[stream.userId]) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = 480;
+        canvasRefs.current[stream.userId] = canvas;
+      }
+
+      const canvas = canvasRefs.current[stream.userId];
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      };
+      img.src = stream.imageData;
+
+      if (!streamRefs.current[stream.userId]) {
+        const canvasStream = canvas.captureStream(30);
+        streamRefs.current[stream.userId] = canvasStream;
+      }
+    });
+
+    const activeUserIds = new Set(streams.map(s => s.userId));
+    Object.keys(canvasRefs.current).forEach(userId => {
+      if (!activeUserIds.has(userId)) {
+        delete canvasRefs.current[userId];
+        if (streamRefs.current[userId]) {
+          streamRefs.current[userId].getTracks().forEach(track => track.stop());
+          delete streamRefs.current[userId];
+        }
+      }
+    });
   }, [streams]);
 
   const handleScreenshot = async (stream: CameraStream) => {
@@ -66,106 +98,44 @@ export default function CameraViewer() {
   };
 
   const startRecording = (stream: CameraStream) => {
-    setRecordingState(prev => ({
-      ...prev,
-      [stream.userId]: {
-        isRecording: true,
-        frames: [stream.imageData],
-        startTime: Date.now(),
-        lastTimestamp: stream.serverTimestamp,
-      },
-    }));
-
-    const interval = setInterval(() => {
-      const currentStream = latestStreamsRef.current.find(s => s.userId === stream.userId);
-      if (currentStream) {
-        setRecordingState(prev => {
-          const current = prev[stream.userId];
-          if (current && current.isRecording) {
-            if (currentStream.serverTimestamp > current.lastTimestamp) {
-              return {
-                ...prev,
-                [stream.userId]: {
-                  ...current,
-                  frames: [...current.frames, currentStream.imageData],
-                  lastTimestamp: currentStream.serverTimestamp,
-                },
-              };
-            }
-          }
-          return prev;
-        });
-      }
-    }, 1000);
-
-    recordingIntervalsRef.current[stream.userId] = interval;
-
-    toast({
-      title: "Recording Started",
-      description: `Recording video from ${stream.userName}`,
-    });
-  };
-
-  const stopRecording = async (userId: string) => {
-    if (recordingIntervalsRef.current[userId]) {
-      clearInterval(recordingIntervalsRef.current[userId]);
-      delete recordingIntervalsRef.current[userId];
+    const canvasStream = streamRefs.current[stream.userId];
+    if (!canvasStream) {
+      toast({
+        title: "Recording Failed",
+        description: "Stream not ready",
+        variant: "destructive",
+      });
+      return;
     }
 
-    const recording = recordingState[userId];
-    if (!recording) return;
-
-    const stream = streams.find(s => s.userId === userId);
-    if (!stream) return;
-
     try {
-      await apiRequest("POST", "/api/admin/camera/capture", {
-        userId,
-        imageData: recording.frames[recording.frames.length - 1],
-        type: 'video',
+      const chunks: Blob[] = [];
+      const mediaRecorder = new MediaRecorder(canvasStream, {
+        mimeType: 'video/webm;codecs=vp8',
+        videoBitsPerSecond: 2500000,
       });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
-      const ctx = canvas.getContext('2d');
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
 
-      if (!ctx) {
-        throw new Error('Failed to get canvas context');
-      }
+      mediaRecorder.start(100);
 
-      const frameDelay = 1000;
-      const gifFrames: ImageData[] = [];
-
-      for (const frameData of recording.frames) {
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = frameData;
-        });
-
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        gifFrames.push(imageData);
-      }
-
-      const zip = await createVideoZip(recording.frames, userId);
-      const link = document.createElement('a');
-      link.download = `video-${userId}-${Date.now()}.zip`;
-      link.href = URL.createObjectURL(zip);
-      link.click();
-      URL.revokeObjectURL(link.href);
+      setRecordingState(prev => ({
+        ...prev,
+        [stream.userId]: {
+          isRecording: true,
+          mediaRecorder,
+          chunks,
+          startTime: Date.now(),
+        },
+      }));
 
       toast({
-        title: "Video Saved",
-        description: `Recorded ${recording.frames.length} frames from ${stream.userName}`,
-      });
-
-      setRecordingState(prev => {
-        const newState = { ...prev };
-        delete newState[userId];
-        return newState;
+        title: "Recording Started",
+        description: `Recording video from ${stream.userName}`,
       });
     } catch (error: any) {
       toast({
@@ -176,32 +146,55 @@ export default function CameraViewer() {
     }
   };
 
-  const createVideoZip = async (frames: string[], userId: string): Promise<Blob> => {
-    const zip = new JSZip();
+  const stopRecording = async (userId: string) => {
+    const recording = recordingState[userId];
+    if (!recording || !recording.mediaRecorder) return;
 
-    for (let i = 0; i < frames.length; i++) {
-      const base64Data = frames[i].split(',')[1];
-      const binaryData = atob(base64Data);
-      const arrayBuffer = new Uint8Array(binaryData.length);
-      for (let j = 0; j < binaryData.length; j++) {
-        arrayBuffer[j] = binaryData.charCodeAt(j);
-      }
-      zip.file(`frame-${String(i).padStart(4, '0')}.jpg`, arrayBuffer);
-    }
+    const stream = streams.find(s => s.userId === userId);
+    if (!stream) return;
 
-    const textContent = `Video Recording
-User ID: ${userId}
-Total Frames: ${frames.length}
-Frame Rate: ~1 fps
-Duration: ~${frames.length} seconds
+    return new Promise<void>((resolve) => {
+      recording.mediaRecorder!.onstop = async () => {
+        try {
+          const blob = new Blob(recording.chunks, { type: 'video/webm' });
+          const duration = ((Date.now() - recording.startTime) / 1000).toFixed(1);
 
-To view: Extract frames and use video editing software to create video.
-Frames are numbered sequentially (frame-0000.jpg, frame-0001.jpg, etc.)
-`;
-    
-    zip.file('README.txt', textContent);
+          await apiRequest("POST", "/api/admin/camera/capture", {
+            userId,
+            imageData: stream.imageData,
+            type: 'video',
+          });
 
-    return await zip.generateAsync({ type: 'blob' });
+          const link = document.createElement('a');
+          link.download = `recording-${userId}-${Date.now()}.webm`;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+
+          toast({
+            title: "Video Saved",
+            description: `Recorded ${duration}s from ${stream.userName}`,
+          });
+
+          setRecordingState(prev => {
+            const newState = { ...prev };
+            delete newState[userId];
+            return newState;
+          });
+
+          resolve();
+        } catch (error: any) {
+          toast({
+            title: "Recording Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+          resolve();
+        }
+      };
+
+      recording.mediaRecorder!.stop();
+    });
   };
 
   if (streams.length === 0) {
@@ -239,7 +232,9 @@ Frames are numbered sequentially (frame-0000.jpg, frame-0001.jpg, etc.)
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {streams.map((stream) => {
           const isRecording = recordingState[stream.userId]?.isRecording || false;
-          const frameCount = recordingState[stream.userId]?.frames.length || 0;
+          const duration = isRecording 
+            ? ((Date.now() - recordingState[stream.userId].startTime) / 1000).toFixed(0)
+            : 0;
 
           return (
             <Card key={stream.userId} className="p-4">
@@ -250,7 +245,7 @@ Frames are numbered sequentially (frame-0000.jpg, frame-0001.jpg, etc.)
                     {isRecording && (
                       <div className="flex items-center gap-2 bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs">
                         <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                        <span>REC {frameCount}f</span>
+                        <span>REC {duration}s</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 bg-destructive text-destructive-foreground px-2 py-1 rounded-full text-xs animate-pulse">
@@ -302,7 +297,7 @@ Frames are numbered sequentially (frame-0000.jpg, frame-0001.jpg, etc.)
                     data-testid={`button-stop-record-${stream.userId}`}
                   >
                     <Square className="mr-2 h-4 w-4" />
-                    Stop ({frameCount}f)
+                    Stop ({duration}s)
                   </Button>
                 )}
               </div>
