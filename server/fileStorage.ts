@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
@@ -102,7 +103,8 @@ class FileDatabase {
   }
 
   private hashPassword(password: string): string {
-    return crypto.createHash('sha256').update(password).digest('hex');
+    const saltRounds = 10;
+    return bcrypt.hashSync(password, saltRounds);
   }
 
   async save() {
@@ -154,7 +156,7 @@ class FileDatabase {
   }
 
   verifyPassword(password: string, hashedPassword: string): boolean {
-    return this.hashPassword(password) === hashedPassword;
+    return bcrypt.compareSync(password, hashedPassword);
   }
 
   // Product operations

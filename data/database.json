@@ -1,52 +1,52 @@
 {
   "users": [
     {
-      "id": "4b2e762f-d72b-41bf-871b-471e3cc53152",
+      "id": "be34fc8f-c619-48a6-af0c-3141d3dcde70",
       "email": "admin@example.com",
-      "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+      "password": "$2b$10$zcXLAorgUpMEfgK/WLYsMegxm0FSrVkoX0zRruPn5F.32f4rJWlrK",
       "firstName": "Admin",
       "lastName": "User",
       "isAdmin": true,
       "diamondBalance": 10000,
-      "createdAt": "2025-11-07T23:59:22.114Z",
-      "updatedAt": "2025-11-07T23:59:22.114Z"
+      "createdAt": "2025-11-08T00:01:43.894Z",
+      "updatedAt": "2025-11-08T00:01:43.894Z"
     },
     {
-      "id": "28635c5b-55ea-4c33-a0ac-b2db45d724e5",
+      "id": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
       "email": "user@example.com",
-      "password": "e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446",
+      "password": "$2b$10$L3zo7L15hXKilISvzEA43.nMgJGV8rjcFYl.aF.FXy3w5jjMa3Tva",
       "firstName": "Regular",
       "lastName": "User",
       "isAdmin": false,
       "diamondBalance": 5000,
-      "createdAt": "2025-11-07T23:59:22.115Z",
-      "updatedAt": "2025-11-07T23:59:22.115Z"
+      "createdAt": "2025-11-08T00:01:43.977Z",
+      "updatedAt": "2025-11-08T00:01:43.977Z"
     }
   ],
   "products": [
     {
-      "id": "cac8e5a6-bb6e-447d-9d9d-d78b7de07016",
+      "id": "92743ad4-4c43-4d22-8547-3ef03086302e",
       "name": "Premium Diamond Package",
       "description": "Get 1000 bonus diamonds with this exclusive package",
       "price": 500,
       "imageUrl": "",
-      "createdAt": "2025-11-07T23:59:22.115Z"
+      "createdAt": "2025-11-08T00:01:43.977Z"
     },
     {
-      "id": "20440be0-c1d6-4c4f-b855-2df75b5aec6d",
+      "id": "b7b90a83-5c40-4cc7-a6f2-c21e0d858231",
       "name": "Elite Diamond Bundle",
       "description": "The ultimate diamond bundle with premium features",
       "price": 1000,
       "imageUrl": "",
-      "createdAt": "2025-11-07T23:59:22.115Z"
+      "createdAt": "2025-11-08T00:01:43.977Z"
     },
     {
-      "id": "7b9d2990-ea53-4ceb-a1a2-63a832e98ddd",
+      "id": "44447dbf-349f-48ed-bfc0-f2a6c691bf45",
       "name": "Starter Diamond Pack",
       "description": "Perfect for beginners, includes 200 diamonds",
       "price": 100,
       "imageUrl": "",
-      "createdAt": "2025-11-07T23:59:22.115Z"
+      "createdAt": "2025-11-08T00:01:43.977Z"
     }
   ],
   "orders": []
