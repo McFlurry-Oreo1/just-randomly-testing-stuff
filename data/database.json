@@ -29,9 +29,9 @@
       "firstName": "Isaac",
       "lastName": "fatty",
       "isAdmin": false,
-      "diamondBalance": 349,
+      "diamondBalance": 249,
       "createdAt": "2025-11-08T00:33:43.184Z",
-      "updatedAt": "2025-11-08T00:34:37.364Z"
+      "updatedAt": "2025-11-08T00:57:31.702Z"
     }
   ],
   "products": [
@@ -68,6 +68,14 @@
       "status": "completed",
       "createdAt": "2025-11-08T00:33:49.821Z",
       "completedAt": "2025-11-08T00:35:21.615Z"
+    },
+    {
+      "id": "38608016-3c3b-4f7a-a54e-1ccbe843ddab",
+      "userId": "81718e40-77b1-402b-a7e2-9347a39c6c8b",
+      "productId": "44447dbf-349f-48ed-bfc0-f2a6c691bf45",
+      "status": "completed",
+      "createdAt": "2025-11-08T00:57:31.704Z",
+      "completedAt": "2025-11-08T00:57:41.776Z"
     }
   ]
 }
