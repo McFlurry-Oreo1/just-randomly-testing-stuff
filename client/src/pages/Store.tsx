@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Product, Order } from "@shared/schema";
@@ -9,12 +9,14 @@ import { ProductCard } from "@/components/ProductCard";
 import { PurchaseModal } from "@/components/PurchaseModal";
 import { Button } from "@/components/ui/button";
 import { Package, Loader2 } from "lucide-react";
+import applePaySound from "@assets/applepay_1762562188782.mp3";
 
 export default function Store() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const applePayAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -25,6 +27,9 @@ export default function Store() {
       return await apiRequest("POST", "/api/purchase", { productId });
     },
     onSuccess: () => {
+      if (applePayAudioRef.current) {
+        applePayAudioRef.current.play().catch(console.error);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
     },
@@ -94,6 +99,7 @@ export default function Store() {
 
   return (
     <div className="py-8">
+      <audio ref={applePayAudioRef} src={applePaySound} preload="auto" />
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Premium Collection</h1>
         <p className="text-muted-foreground">

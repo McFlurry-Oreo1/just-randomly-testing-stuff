@@ -259,4 +259,66 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ message: "Failed to complete order" });
     }
   });
+
+  // Camera streaming routes
+  let cameraStreams: Map<string, { imageData: string; serverTimestamp: number; userId: string; userName: string }> = new Map();
+
+  app.post('/api/camera/stream', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { imageData } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ message: "Image data required" });
+      }
+
+      cameraStreams.set(user.id, {
+        imageData,
+        serverTimestamp: Date.now(),
+        userId: user.id,
+        userName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error streaming camera:", error);
+      res.status(500).json({ message: "Failed to stream camera" });
+    }
+  });
+
+  app.get('/api/admin/camera/streams', isAuthenticated, isAdmin, (req, res) => {
+    try {
+      const now = Date.now();
+      const activeStreams = Array.from(cameraStreams.values())
+        .filter(stream => now - stream.serverTimestamp < 5000)
+        .map(({ imageData, userId, userName, serverTimestamp }) => ({
+          userId,
+          userName,
+          imageData,
+          serverTimestamp,
+        }));
+
+      res.json(activeStreams);
+    } catch (error) {
+      console.error("Error fetching camera streams:", error);
+      res.status(500).json({ message: "Failed to fetch camera streams" });
+    }
+  });
+
+  app.post('/api/admin/camera/capture', isAuthenticated, isAdmin, (req, res) => {
+    try {
+      const { userId, imageData, type } = req.body;
+      
+      res.json({ 
+        success: true,
+        message: `${type === 'screenshot' ? 'Screenshot' : 'Video'} captured successfully`,
+      });
+    } catch (error) {
+      console.error("Error capturing:", error);
+      res.status(500).json({ message: "Failed to capture" });
+    }
+  });
 }

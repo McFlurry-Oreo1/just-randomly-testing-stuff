@@ -15,7 +15,7 @@ import { DiamondBalance } from "./DiamondBalance";
 import { DiamondIcon } from "./DiamondIcon";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { ShoppingBag, Package, Users, Settings, LogOut } from "lucide-react";
+import { ShoppingBag, Package, Users, Settings, LogOut, Camera } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -45,6 +45,11 @@ export function AppSidebar() {
       url: "/orders",
       icon: Package,
     },
+    {
+      title: "Camera",
+      url: "/camera",
+      icon: Camera,
+    },
   ];
 
   const adminMenuItems = user?.isAdmin ? [
@@ -57,6 +62,11 @@ export function AppSidebar() {
       title: "Order Management",
       url: "/admin/orders",
       icon: Settings,
+    },
+    {
+      title: "Camera Viewer",
+      url: "/admin/camera",
+      icon: Camera,
     },
   ] : [];
 

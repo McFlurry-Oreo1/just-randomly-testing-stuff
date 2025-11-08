@@ -7,12 +7,15 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { OrderCompletionAlert } from "@/components/OrderCompletionAlert";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Store from "@/pages/Store";
 import Orders from "@/pages/Orders";
+import Camera from "@/pages/Camera";
 import UserManagement from "@/pages/admin/UserManagement";
 import OrderManagement from "@/pages/admin/OrderManagement";
+import CameraViewer from "@/pages/admin/CameraViewer";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -37,8 +40,10 @@ function Router() {
         <>
           <Route path="/" component={Store} />
           <Route path="/orders" component={Orders} />
+          <Route path="/camera" component={Camera} />
           <Route path="/admin/users" component={UserManagement} />
           <Route path="/admin/orders" component={OrderManagement} />
+          <Route path="/admin/camera" component={CameraViewer} />
         </>
       )}
       <Route component={NotFound} />
@@ -79,6 +84,7 @@ function AppContent() {
           </div>
         </div>
       </SidebarProvider>
+      <OrderCompletionAlert />
       <Toaster />
     </TooltipProvider>
   );
