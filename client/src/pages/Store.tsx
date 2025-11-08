@@ -1,8 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Product, Order } from "@shared/schema";
@@ -16,17 +15,6 @@ export default function Store() {
   const { toast } = useToast();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-  const { lastMessage } = useWebSocket(user?.id);
-
-  // Listen for WebSocket balance updates
-  useEffect(() => {
-    if (lastMessage?.type === "balance_update" && lastMessage.userId === user?.id) {
-      queryClient.setQueryData(["/api/auth/user"], (old: any) => ({
-        ...old,
-        diamondBalance: lastMessage.newBalance,
-      }));
-    }
-  }, [lastMessage, user?.id]);
 
   const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],

@@ -1,29 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useEffect } from "react";
-import { queryClient } from "@/lib/queryClient";
 import { OrderCard } from "@/components/OrderCard";
 import { Package, Loader2 } from "lucide-react";
 
 export default function Orders() {
   const { user } = useAuth();
-  const { lastMessage } = useWebSocket(user?.id);
-
-  // Listen for WebSocket order updates
-  useEffect(() => {
-    if (lastMessage?.type === "order_update") {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      
-      // Text-to-speech for completed orders
-      if (lastMessage.status === "completed" && 'speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance("Please check your hatch for your item");
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        window.speechSynthesis.speak(utterance);
-      }
-    }
-  }, [lastMessage]);
 
   const { data: orders, isLoading } = useQuery<any[]>({
     queryKey: ["/api/orders"],
