@@ -1,17 +1,16 @@
 
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Camera, Download, Video as VideoIcon, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { io, Socket } from "socket.io-client";
+import SimplePeer from "simple-peer";
 
-interface CameraStream {
+interface StreamInfo {
   userId: string;
   userName: string;
-  imageData: string;
-  serverTimestamp: number;
+  stream: MediaStream | null;
 }
 
 interface RecordingState {
@@ -25,81 +24,128 @@ interface RecordingState {
 
 export default function CameraViewer() {
   const { toast } = useToast();
+  const [streams, setStreams] = useState<StreamInfo[]>([]);
   const [recordingState, setRecordingState] = useState<RecordingState>({});
-  const canvasRefs = useRef<{ [userId: string]: HTMLCanvasElement }>({});
-  const streamRefs = useRef<{ [userId: string]: MediaStream }>({});
-
-  const { data: streams = [] } = useQuery<CameraStream[]>({
-    queryKey: ["/api/admin/camera/streams"],
-    refetchInterval: 100,
-  });
+  const socketRef = useRef<Socket | null>(null);
+  const peersRef = useRef<Map<string, SimplePeer.Instance>>(new Map());
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   useEffect(() => {
-    streams.forEach((stream) => {
-      if (!canvasRefs.current[stream.userId]) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 640;
-        canvas.height = 480;
-        canvasRefs.current[stream.userId] = canvas;
+    const socket = io(window.location.origin);
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("Admin socket connected");
+      socket.emit("register-admin");
+    });
+
+    socket.on("active-streams", (userIds: string[]) => {
+      userIds.forEach(userId => requestStream(userId));
+    });
+
+    socket.on("stream-available", (userId: string) => {
+      requestStream(userId);
+    });
+
+    socket.on("stream-unavailable", (userId: string) => {
+      const peer = peersRef.current.get(userId);
+      if (peer) {
+        peer.destroy();
+        peersRef.current.delete(userId);
       }
+      setStreams(prev => prev.filter(s => s.userId !== userId));
+    });
 
-      const canvas = canvasRefs.current[stream.userId];
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      };
-      img.src = stream.imageData;
-
-      if (!streamRefs.current[stream.userId]) {
-        const canvasStream = canvas.captureStream(30);
-        streamRefs.current[stream.userId] = canvasStream;
+    socket.on("signal", ({ from, signal }: { from: string; signal: any }) => {
+      const peer = peersRef.current.get(from);
+      if (peer) {
+        peer.signal(signal);
       }
     });
 
-    const activeUserIds = new Set(streams.map(s => s.userId));
-    Object.keys(canvasRefs.current).forEach(userId => {
-      if (!activeUserIds.has(userId)) {
-        delete canvasRefs.current[userId];
-        if (streamRefs.current[userId]) {
-          streamRefs.current[userId].getTracks().forEach(track => track.stop());
-          delete streamRefs.current[userId];
+    return () => {
+      socket.disconnect();
+      peersRef.current.forEach(peer => peer.destroy());
+      peersRef.current.clear();
+    };
+  }, []);
+
+  const requestStream = (userId: string) => {
+    if (peersRef.current.has(userId)) return;
+
+    const peer = new SimplePeer({
+      initiator: false,
+      trickle: false,
+    });
+
+    peer.on("signal", (signal) => {
+      socketRef.current?.emit("signal", {
+        to: userId,
+        signal,
+      });
+    });
+
+    peer.on("stream", (stream: MediaStream) => {
+      setStreams(prev => {
+        const existing = prev.find(s => s.userId === userId);
+        if (existing) {
+          return prev.map(s => s.userId === userId ? { ...s, stream } : s);
         }
-      }
+        return [...prev, { userId, userName: `User ${userId.slice(0, 8)}`, stream }];
+      });
+
+      // Attach stream to video element
+      setTimeout(() => {
+        const video = videoRefs.current.get(userId);
+        if (video && stream) {
+          video.srcObject = stream;
+        }
+      }, 100);
     });
-  }, [streams]);
 
-  const handleScreenshot = async (stream: CameraStream) => {
-    try {
-      await apiRequest("POST", "/api/admin/camera/capture", {
-        userId: stream.userId,
-        imageData: stream.imageData,
-        type: 'screenshot',
-      });
+    peer.on("error", (err) => {
+      console.error("Peer error:", err);
+    });
 
-      const link = document.createElement('a');
-      link.download = `screenshot-${stream.userId}-${Date.now()}.jpg`;
-      link.href = stream.imageData;
-      link.click();
+    peer.on("close", () => {
+      peersRef.current.delete(userId);
+      setStreams(prev => prev.filter(s => s.userId !== userId));
+    });
 
-      toast({
-        title: "Screenshot Saved",
-        description: `Screenshot from ${stream.userName} downloaded`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Screenshot Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    peersRef.current.set(userId, peer);
+    socketRef.current?.emit("request-stream", userId);
   };
 
-  const startRecording = (stream: CameraStream) => {
-    const canvasStream = streamRefs.current[stream.userId];
-    if (!canvasStream) {
+  const handleScreenshot = (streamInfo: StreamInfo) => {
+    const video = videoRefs.current.get(streamInfo.userId);
+    if (!video || !streamInfo.stream) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const link = document.createElement('a');
+        link.download = `screenshot-${streamInfo.userId}-${Date.now()}.jpg`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        toast({
+          title: "Screenshot Saved",
+          description: `Screenshot from ${streamInfo.userName} downloaded`,
+        });
+      }
+    }, 'image/jpeg', 0.95);
+  };
+
+  const startRecording = (streamInfo: StreamInfo) => {
+    if (!streamInfo.stream) {
       toast({
         title: "Recording Failed",
         description: "Stream not ready",
@@ -110,8 +156,8 @@ export default function CameraViewer() {
 
     try {
       const chunks: Blob[] = [];
-      const mediaRecorder = new MediaRecorder(canvasStream, {
-        mimeType: 'video/webm;codecs=vp8',
+      const mediaRecorder = new MediaRecorder(streamInfo.stream, {
+        mimeType: 'video/webm;codecs=vp9',
         videoBitsPerSecond: 2500000,
       });
 
@@ -125,7 +171,7 @@ export default function CameraViewer() {
 
       setRecordingState(prev => ({
         ...prev,
-        [stream.userId]: {
+        [streamInfo.userId]: {
           isRecording: true,
           mediaRecorder,
           chunks,
@@ -135,7 +181,7 @@ export default function CameraViewer() {
 
       toast({
         title: "Recording Started",
-        description: `Recording video from ${stream.userName}`,
+        description: `Recording video from ${streamInfo.userName}`,
       });
     } catch (error: any) {
       toast({
@@ -158,12 +204,6 @@ export default function CameraViewer() {
         try {
           const blob = new Blob(recording.chunks, { type: 'video/webm' });
           const duration = ((Date.now() - recording.startTime) / 1000).toFixed(1);
-
-          await apiRequest("POST", "/api/admin/camera/capture", {
-            userId,
-            imageData: stream.imageData,
-            type: 'video',
-          });
 
           const link = document.createElement('a');
           link.download = `recording-${userId}-${Date.now()}.webm`;
@@ -230,17 +270,17 @@ export default function CameraViewer() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {streams.map((stream) => {
-          const isRecording = recordingState[stream.userId]?.isRecording || false;
+        {streams.map((streamInfo) => {
+          const isRecording = recordingState[streamInfo.userId]?.isRecording || false;
           const duration = isRecording 
-            ? ((Date.now() - recordingState[stream.userId].startTime) / 1000).toFixed(0)
+            ? ((Date.now() - recordingState[streamInfo.userId].startTime) / 1000).toFixed(0)
             : 0;
 
           return (
-            <Card key={stream.userId} className="p-4">
+            <Card key={streamInfo.userId} className="p-4">
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">{stream.userName}</h3>
+                  <h3 className="font-semibold">{streamInfo.userName}</h3>
                   <div className="flex items-center gap-2">
                     {isRecording && (
                       <div className="flex items-center gap-2 bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs">
@@ -255,46 +295,50 @@ export default function CameraViewer() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  User ID: {stream.userId}
+                  User ID: {streamInfo.userId}
                 </p>
               </div>
 
               <div className="aspect-video bg-muted rounded-lg overflow-hidden mb-3">
-                <img
-                  src={stream.imageData}
-                  alt={`Live feed from ${stream.userName}`}
+                <video
+                  ref={(el) => {
+                    if (el) videoRefs.current.set(streamInfo.userId, el);
+                  }}
+                  autoPlay
+                  playsInline
                   className="w-full h-full object-cover"
-                  data-testid={`img-stream-${stream.userId}`}
+                  data-testid={`video-stream-${streamInfo.userId}`}
                 />
               </div>
 
               <div className="flex gap-2 flex-wrap">
                 <Button
-                  onClick={() => handleScreenshot(stream)}
+                  onClick={() => handleScreenshot(streamInfo)}
                   size="sm"
                   variant="outline"
-                  disabled={isRecording}
-                  data-testid={`button-screenshot-${stream.userId}`}
+                  disabled={isRecording || !streamInfo.stream}
+                  data-testid={`button-screenshot-${streamInfo.userId}`}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Screenshot
                 </Button>
                 {!isRecording ? (
                   <Button
-                    onClick={() => startRecording(stream)}
+                    onClick={() => startRecording(streamInfo)}
                     size="sm"
                     variant="outline"
-                    data-testid={`button-record-${stream.userId}`}
+                    disabled={!streamInfo.stream}
+                    data-testid={`button-record-${streamInfo.userId}`}
                   >
                     <VideoIcon className="mr-2 h-4 w-4" />
                     Start Recording
                   </Button>
                 ) : (
                   <Button
-                    onClick={() => stopRecording(stream.userId)}
+                    onClick={() => stopRecording(streamInfo.userId)}
                     size="sm"
                     variant="destructive"
-                    data-testid={`button-stop-record-${stream.userId}`}
+                    data-testid={`button-stop-record-${streamInfo.userId}`}
                   >
                     <Square className="mr-2 h-4 w-4" />
                     Stop ({duration}s)

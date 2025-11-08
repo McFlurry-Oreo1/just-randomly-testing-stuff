@@ -1,22 +1,93 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Camera as CameraIcon, Video, Square, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { io, Socket } from "socket.io-client";
+import SimplePeer from "simple-peer";
 
 export default function Camera() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const peersRef = useRef<Map<string, SimplePeer.Instance>>(new Map());
+
+  useEffect(() => {
+    // Connect to Socket.IO
+    const socket = io(window.location.origin);
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("Socket connected");
+    });
+
+    socket.on("stream-requested", (adminSocketId: string) => {
+      if (streamRef.current) {
+        createPeerConnection(adminSocketId, true);
+      }
+    });
+
+    socket.on("signal", ({ from, signal }: { from: string; signal: any }) => {
+      const peer = peersRef.current.get(from);
+      if (peer) {
+        peer.signal(signal);
+      } else if (streamRef.current) {
+        createPeerConnection(from, false, signal);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+      peersRef.current.forEach(peer => peer.destroy());
+      peersRef.current.clear();
+    };
+  }, []);
+
+  const createPeerConnection = (targetSocketId: string, initiator: boolean, initialSignal?: any) => {
+    if (!streamRef.current) return;
+
+    const peer = new SimplePeer({
+      initiator,
+      trickle: false,
+      stream: streamRef.current,
+    });
+
+    peer.on("signal", (signal) => {
+      socketRef.current?.emit("signal", {
+        to: targetSocketId,
+        signal,
+      });
+    });
+
+    peer.on("error", (err) => {
+      console.error("Peer error:", err);
+    });
+
+    peer.on("close", () => {
+      peersRef.current.delete(targetSocketId);
+    });
+
+    if (initialSignal) {
+      peer.signal(initialSignal);
+    }
+
+    peersRef.current.set(targetSocketId, peer);
+  };
 
   const requestCameraPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
         audio: false,
       });
 
@@ -40,28 +111,8 @@ export default function Camera() {
     }
   };
 
-  const captureAndSendFrame = async () => {
-    if (!videoRef.current) return;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) return;
-
-    ctx.drawImage(videoRef.current, 0, 0);
-    const imageData = canvas.toDataURL("image/jpeg", 0.7);
-
-    try {
-      await apiRequest("POST", "/api/camera/stream", { imageData });
-    } catch (error) {
-      console.error("Failed to send frame:", error);
-    }
-  };
-
   const startStreaming = () => {
-    if (!streamRef.current) {
+    if (!streamRef.current || !user) {
       toast({
         title: "No Camera Access",
         description: "Please grant camera permission first",
@@ -70,8 +121,8 @@ export default function Camera() {
       return;
     }
 
+    socketRef.current?.emit("register-streamer", user.id);
     setIsStreaming(true);
-    streamIntervalRef.current = setInterval(captureAndSendFrame, 1000);
 
     toast({
       title: "Streaming Started",
@@ -80,11 +131,9 @@ export default function Camera() {
   };
 
   const stopStreaming = () => {
-    if (streamIntervalRef.current) {
-      clearInterval(streamIntervalRef.current);
-      streamIntervalRef.current = null;
-    }
-
+    peersRef.current.forEach(peer => peer.destroy());
+    peersRef.current.clear();
+    
     setIsStreaming(false);
     toast({
       title: "Streaming Stopped",
@@ -94,9 +143,6 @@ export default function Camera() {
 
   useEffect(() => {
     return () => {
-      if (streamIntervalRef.current) {
-        clearInterval(streamIntervalRef.current);
-      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -188,7 +234,7 @@ export default function Camera() {
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-2">Privacy Notice</h3>
           <p className="text-sm text-muted-foreground">
-            When you start streaming, your camera feed will be sent to the admin in real-time. 
+            When you start streaming, your camera feed will be sent to the admin in real-time via WebRTC. 
             The admin can view your video feed and capture screenshots or recordings. 
             You can stop streaming at any time by clicking the "Stop Streaming" button.
           </p>
