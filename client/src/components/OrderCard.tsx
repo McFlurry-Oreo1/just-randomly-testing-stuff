@@ -56,7 +56,14 @@ export function OrderCard({ order, showUserInfo = false }: OrderCardProps) {
           <div className="flex items-center justify-between">
             <DiamondBalance balance={order.product?.price ?? 0} size="sm" />
             <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+              {(() => {
+                try {
+                  const date = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+                  return formatDistanceToNow(date, { addSuffix: true });
+                } catch (e) {
+                  return "just now";
+                }
+              })()}
             </span>
           </div>
 
