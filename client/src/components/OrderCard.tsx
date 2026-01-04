@@ -58,7 +58,9 @@ export function OrderCard({ order, showUserInfo = false }: OrderCardProps) {
             <span className="text-xs text-muted-foreground">
               {(() => {
                 try {
+                  if (!order.createdAt) return "just now";
                   const date = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+                  if (isNaN(date.getTime())) return "just now";
                   return formatDistanceToNow(date, { addSuffix: true });
                 } catch (e) {
                   return "just now";
