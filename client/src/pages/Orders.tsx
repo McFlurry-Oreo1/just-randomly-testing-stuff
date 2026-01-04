@@ -1,14 +1,34 @@
-import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrderCard } from "@/components/OrderCard";
 import { Package, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { db, collection, query, orderBy, onSnapshot, where } from "@/lib/firebase";
 
 export default function Orders() {
   const { user } = useAuth();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: orders, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/orders"],
-  });
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const q = query(
+      collection(db, "orders"),
+      where("email", "==", user.email),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const ordersData: any[] = [];
+      querySnapshot.forEach((doc) => {
+        ordersData.push({ id: doc.id, ...doc.data() });
+      });
+      setOrders(ordersData);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.email]);
 
   if (isLoading) {
     return (

@@ -16,4 +16,4 @@ const app = initializeApp(firebaseConfig);
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 const db = getFirestore(app);
 
-export { app, analytics, db, doc, getDoc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, updateDoc };
+export { app, analytics, db, doc, getDoc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, updateDoc, where };

@@ -1,62 +1,65 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { Order } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import { db, collection, query, where, onSnapshot } from "@/lib/firebase";
 import alarmSound from "@assets/danger-alarm-sound-effect-meme_1762562209864.mp3";
 
 export function OrderCompletionAlert() {
+  const { user } = useAuth();
   const [showAlert, setShowAlert] = useState(false);
   const lastCheckedOrdersRef = useRef<Set<string>>(new Set());
   const hasInitializedRef = useRef(false);
   const alarmAudioRef = useRef<HTMLAudioElement | null>(null);
-  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const speechIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { data: orders } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-    refetchInterval: 5000,
-  });
-
   useEffect(() => {
-    if (!orders) return;
+    if (!user?.email) return;
 
-    const completedOrderIds = orders
-      .filter(order => order.status === "completed")
-      .map(order => order.id);
-
-    if (!hasInitializedRef.current) {
-      hasInitializedRef.current = true;
-      lastCheckedOrdersRef.current = new Set(completedOrderIds);
-      return;
-    }
-
-    const newCompletedOrders = completedOrderIds.filter(
-      id => !lastCheckedOrdersRef.current.has(id)
+    const q = query(
+      collection(db, "orders"),
+      where("email", "==", user.email),
+      where("status", "==", "completed")
     );
 
-    if (newCompletedOrders.length > 0) {
-      setShowAlert(true);
-      startAlarmAndVoice();
-    }
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const completedOrderIds = querySnapshot.docs.map(doc => doc.id);
 
-    lastCheckedOrdersRef.current = new Set(completedOrderIds);
-  }, [orders]);
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        lastCheckedOrdersRef.current = new Set(completedOrderIds);
+        return;
+      }
+
+      const newCompletedOrders = completedOrderIds.filter(
+        id => !lastCheckedOrdersRef.current.has(id)
+      );
+
+      if (newCompletedOrders.length > 0) {
+        setShowAlert(true);
+        startAlarmAndVoice();
+      }
+
+      lastCheckedOrdersRef.current = new Set(completedOrderIds);
+    });
+
+    return () => unsubscribe();
+  }, [user?.email]);
 
   const startAlarmAndVoice = () => {
     if (alarmAudioRef.current) {
       alarmAudioRef.current.loop = true;
+      alarmAudioRef.current.volume = 1.0;
       alarmAudioRef.current.play().catch(console.error);
     }
 
     const speak = () => {
-      const utterance = new SpeechSynthesisUtterance("Please check the box. Please check the box.");
+      const utterance = new SpeechSynthesisUtterance("Your order is here. Your order is here.");
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
       speechSynthesis.speak(utterance);
-      speechSynthesisRef.current = utterance;
     };
 
     speak();
