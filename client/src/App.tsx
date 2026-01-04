@@ -145,6 +145,7 @@ function AppContent() {
       <SidebarProvider style={style as React.CSSProperties}>
         <div className="flex h-screen w-full">
           <AppSidebar />
+          <GameTimer />
           <div className="flex flex-col flex-1 overflow-hidden">
             <header className="flex items-center justify-between p-4 border-b glass sticky top-0 z-40">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
