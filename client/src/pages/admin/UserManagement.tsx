@@ -7,13 +7,53 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { DiamondBalance } from "@/components/DiamondBalance";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useState } from "react";
-import { Users, Loader2, Plus, Minus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, Loader2, Plus, Minus, Trash2, Play, Pause, RotateCcw } from "lucide-react";
 import type { User } from "@shared/schema";
+import { db, doc, onSnapshot, setDoc, updateDoc } from "@/lib/firebase";
 
 export default function UserManagement() {
   const { toast } = useToast();
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
+  const [gameState, setGameState] = useState<any>(null);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, "settings", "game"), (docSnap) => {
+      if (docSnap.exists()) {
+        setGameState(docSnap.data());
+      } else {
+        setDoc(doc(db, "settings", "game"), {
+          isActive: false,
+          timeLeft: 3600,
+          lastTick: Date.now()
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const toggleGame = async () => {
+    const newState = !gameState?.isActive;
+    await updateDoc(doc(db, "settings", "game"), {
+      isActive: newState,
+      lastTick: Date.now()
+    });
+  };
+
+  const resetGame = async () => {
+    await updateDoc(doc(db, "settings", "game"), {
+      isActive: false,
+      timeLeft: 3600,
+      lastTick: Date.now()
+    });
+  };
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -114,11 +154,27 @@ export default function UserManagement() {
 
   return (
     <div className="py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">User Management</h1>
-        <p className="text-muted-foreground">
-          Manage user accounts and diamond balances.
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold mb-2">User Management</h1>
+          <p className="text-muted-foreground">
+            Manage user accounts and diamond balances.
+          </p>
+        </div>
+        <Card className="glass p-4 flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Game Timer</p>
+            <p className="text-2xl font-mono font-bold">{formatTime(gameState?.timeLeft || 3600)}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="icon" variant={gameState?.isActive ? "destructive" : "default"} onClick={toggleGame}>
+              {gameState?.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </Button>
+            <Button size="icon" variant="outline" onClick={resetGame}>
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          </div>
+        </Card>
       </div>
 
       <div className="space-y-4">

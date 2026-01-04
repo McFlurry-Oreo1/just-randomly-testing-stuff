@@ -18,7 +18,76 @@ import UserManagement from "./pages/admin/UserManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
 import OrderManagement from "./pages/admin/OrderManagement";
 import CameraViewer from "./pages/admin/CameraViewer";
-import { Loader2 } from "lucide-react";
+import { Loader2, Timer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { db, doc, onSnapshot, updateDoc, setDoc } from "@/lib/firebase";
+
+function GameTimer() {
+  const { user } = useAuth();
+  const [gameState, setGameState] = useState<any>(null);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, "settings", "game"), (docSnap) => {
+      if (docSnap.exists()) {
+        setGameState(docSnap.data());
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!gameState?.isActive || gameState.timeLeft <= 0) return;
+
+    const interval = setInterval(async () => {
+      const newTime = Math.max(0, gameState.timeLeft - 1);
+      
+      // Update timer in Firebase (throttled by one client)
+      // In a real app, this should be a cloud function, but here we'll let the admin handle it
+      // or the first active user. For simplicity, we'll sync locally and let admin drive the "master" clock
+      // if they are online, otherwise users will tick it.
+      if (user?.isAdmin) {
+        await updateDoc(doc(db, "settings", "game"), {
+          timeLeft: newTime,
+          lastTick: Date.now()
+        });
+      }
+
+      // 30 second increment logic
+      if (newTime % 30 === 0 && newTime !== 3600) {
+        if (user?.email) {
+          const userDocRef = doc(db, "locked", user.email);
+          await setDoc(userDocRef, {
+            diamondBalance: (user.diamondBalance || 0) + 50
+          }, { merge: true });
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState?.isActive, gameState?.timeLeft, user?.isAdmin, user?.email, user?.diamondBalance]);
+
+  if (!gameState || gameState.timeLeft <= 0) return null;
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 duration-500">
+      <div className={`glass p-4 rounded-2xl flex items-center gap-4 shadow-2xl border-primary/20 ${gameState.isActive ? 'border-primary' : 'opacity-50'}`}>
+        <div className={`p-2 rounded-full ${gameState.isActive ? 'bg-primary/20 text-primary animate-pulse' : 'bg-muted text-muted-foreground'}`}>
+          <Timer className="w-6 h-6" />
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Game Session</p>
+          <p className="text-2xl font-mono font-black tabular-nums">{formatTime(gameState.timeLeft)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
