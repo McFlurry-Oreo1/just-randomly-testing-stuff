@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "wouter";
+import { Redirect } from "wouter";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
@@ -23,11 +23,11 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
   }
 
   if (!user) {
-    return <Navigate to="/" />;
+    return <Redirect to="/" />;
   }
 
   if (adminOnly && !user.isAdmin) {
-    return <Navigate to="/" />;
+    return <Redirect to="/" />;
   }
 
   return <>{children}</>;
