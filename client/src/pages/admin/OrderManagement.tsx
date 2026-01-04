@@ -5,37 +5,48 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { OrderCard } from "@/components/OrderCard";
 import { Package, Loader2, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { db, collection, query, orderBy, onSnapshot, doc, setDoc } from "@/lib/firebase";
 
 export default function OrderManagement() {
   const { toast } = useToast();
+  const [firebaseOrders, setFirebaseOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: orders, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/orders"],
-  });
+  useEffect(() => {
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const orders: any[] = [];
+      querySnapshot.forEach((doc) => {
+        orders.push({ id: doc.id, ...doc.data() });
+      });
+      setFirebaseOrders(orders);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const completeOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      return await apiRequest("POST", `/api/admin/orders/${orderId}/complete`, undefined);
+      // Update Firebase first for instant feedback
+      const orderRef = doc(db, "orders", orderId);
+      await setDoc(orderRef, { status: "completed" }, { merge: true });
+      
+      // Then sync to backend if needed (optional since we're relying on Firebase now)
+      try {
+        await apiRequest("POST", `/api/admin/orders/${orderId}/complete`, undefined);
+      } catch (e) {
+        console.error("Failed to sync status to backend", e);
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       toast({
         title: "Success",
         description: "Order marked as completed",
       });
     },
     onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
       toast({
         title: "Error",
         description: error.message,
@@ -55,8 +66,8 @@ export default function OrderManagement() {
     );
   }
 
-  const pendingOrders = orders?.filter(o => o.status === "pending") || [];
-  const completedOrders = orders?.filter(o => o.status === "completed") || [];
+  const pendingOrders = firebaseOrders.filter(o => o.status === "pending");
+  const completedOrders = firebaseOrders.filter(o => o.status === "completed");
 
   return (
     <div className="py-8">

@@ -10,6 +10,7 @@ import { PurchaseModal } from "@/components/PurchaseModal";
 import { Button } from "@/components/ui/button";
 import { Package, Loader2 } from "lucide-react";
 import applePaySound from "@assets/applepay_1762562188782.mp3";
+import { db, collection, addDoc, serverTimestamp, doc, setDoc } from "@/lib/firebase";
 
 export default function Store() {
   const { user } = useAuth();
@@ -24,7 +25,33 @@ export default function Store() {
 
   const purchaseMutation = useMutation({
     mutationFn: async (productId: string) => {
-      return await apiRequest("POST", "/api/purchase", { productId });
+      // First call backend to process and record in PG
+      const response = await apiRequest("POST", "/api/purchase", { productId });
+      
+      // Then sync to Firebase for instant admin visibility
+      if (user?.email && selectedProduct) {
+        const orderData = {
+          userId: user.id,
+          email: user.email,
+          productId: selectedProduct.id,
+          productName: selectedProduct.name,
+          price: selectedProduct.price,
+          status: "pending",
+          createdAt: serverTimestamp(),
+          userName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email
+        };
+
+        // Add to main global orders collection for admin
+        await addDoc(collection(db, "orders"), orderData);
+        
+        // Update user's diamond balance in Firebase
+        const userDocRef = doc(db, "locked", user.email);
+        await setDoc(userDocRef, {
+          diamondBalance: user.diamondBalance - selectedProduct.price
+        }, { merge: true });
+      }
+      
+      return response;
     },
     onSuccess: () => {
       if (applePayAudioRef.current) {
