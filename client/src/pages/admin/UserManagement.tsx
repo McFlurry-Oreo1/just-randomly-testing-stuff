@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { Users, Loader2, Plus, Minus, Trash2, Play, Pause, RotateCcw } from "lucide-react";
 import type { User } from "@shared/schema";
-import { db, doc, onSnapshot, setDoc, updateDoc } from "@/lib/firebase";
+import { db, doc, onSnapshot, setDoc, updateDoc, getDoc } from "@/lib/firebase";
 
 export default function UserManagement() {
   const { toast } = useToast();
@@ -29,102 +29,41 @@ export default function UserManagement() {
         });
       }
     });
+
+    // Also sync users to Firebase if they don't exist there
+    if (users) {
+      users.forEach(async (u) => {
+        const userRef = doc(db, "locked", u.email);
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            email: u.email,
+            diamondBalance: u.diamondBalance,
+            isAdmin: u.isAdmin,
+            firstName: u.firstName || "",
+            lastName: u.lastName || ""
+          });
+        }
+      });
+    }
+
     return () => unsubscribe();
-  }, []);
+  }, [users]);
 
-  const toggleGame = async () => {
-    const newState = !gameState?.isActive;
-    await updateDoc(doc(db, "settings", "game"), {
-      isActive: newState,
-      lastTick: Date.now()
-    });
-  };
-
-  const resetGame = async () => {
-    await updateDoc(doc(db, "settings", "game"), {
-      isActive: false,
-      timeLeft: 3600,
-      lastTick: Date.now()
-    });
-  };
-
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ["/api/admin/users"],
-  });
-
-  const adjustDiamondsMutation = useMutation({
-    mutationFn: async ({ userId, amount }: { userId: string; amount: number }) => {
-      return await apiRequest("POST", "/api/admin/adjust-diamonds", { userId, amount });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Success",
-        description: "Diamond balance updated successfully",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      return await apiRequest("DELETE", `/api/admin/users/${userId}`, undefined);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Success",
-        description: "User deleted successfully",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAdjustDiamonds = (userId: string) => {
+  const handleAdjustDiamonds = async (userId: string) => {
     const amount = adjustments[userId];
     if (amount && amount !== 0) {
-      adjustDiamondsMutation.mutate({ userId, amount });
+      const user = users?.find(u => u.id === userId);
+      if (user) {
+        // Update PG
+        await adjustDiamondsMutation.mutateAsync({ userId, amount });
+        
+        // Update Firebase for instant sync
+        const userRef = doc(db, "locked", user.email);
+        const snap = await getDoc(userRef);
+        const currentBalance = snap.exists() ? snap.data().diamondBalance : user.diamondBalance;
+        await setDoc(userRef, { diamondBalance: currentBalance + amount }, { merge: true });
+      }
       setAdjustments({ ...adjustments, [userId]: 0 });
     }
   };

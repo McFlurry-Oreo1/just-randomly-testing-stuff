@@ -14,10 +14,13 @@ import Landing from "@/pages/Landing";
 import Store from "@/pages/Store";
 import Orders from "@/pages/Orders";
 import Camera from "@/pages/Camera";
+import UserManagement from "./pages/admin/UserManagement";
+import ProductManagement from "./pages/admin/ProductManagement";
+import OrderManagement from "./pages/admin/OrderManagement";
+import CameraViewer from "./pages/admin/CameraViewer";
 import { Loader2, Timer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { db, doc, onSnapshot, updateDoc, setDoc } from "@/lib/firebase";
-import { useAuth } from "@/hooks/useAuth";
 
 function GameTimer() {
   const { user } = useAuth();
@@ -56,7 +59,7 @@ function GameTimer() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState?.isActive, gameState?.timeLeft, user?.isAdmin, user?.email, user.diamondBalance]);
+  }, [gameState?.isActive, gameState?.timeLeft, user?.isAdmin, user?.email, user?.diamondBalance]);
 
   if (!gameState || gameState.timeLeft <= 0) return null;
 
