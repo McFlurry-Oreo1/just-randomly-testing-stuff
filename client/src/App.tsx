@@ -14,13 +14,10 @@ import Landing from "@/pages/Landing";
 import Store from "@/pages/Store";
 import Orders from "@/pages/Orders";
 import Camera from "@/pages/Camera";
-import UserManagement from "./pages/admin/UserManagement";
-import ProductManagement from "./pages/admin/ProductManagement";
-import OrderManagement from "./pages/admin/OrderManagement";
-import CameraViewer from "./pages/admin/CameraViewer";
 import { Loader2, Timer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { db, doc, onSnapshot, updateDoc, setDoc } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 
 function GameTimer() {
   const { user } = useAuth();
@@ -41,10 +38,6 @@ function GameTimer() {
     const interval = setInterval(async () => {
       const newTime = Math.max(0, gameState.timeLeft - 1);
       
-      // Update timer in Firebase (throttled by one client)
-      // In a real app, this should be a cloud function, but here we'll let the admin handle it
-      // or the first active user. For simplicity, we'll sync locally and let admin drive the "master" clock
-      // if they are online, otherwise users will tick it.
       if (user?.isAdmin) {
         await updateDoc(doc(db, "settings", "game"), {
           timeLeft: newTime,
@@ -52,7 +45,6 @@ function GameTimer() {
         });
       }
 
-      // 30 second increment logic
       if (newTime % 30 === 0 && newTime !== 3600) {
         if (user?.email) {
           const userDocRef = doc(db, "locked", user.email);
@@ -64,7 +56,7 @@ function GameTimer() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState?.isActive, gameState?.timeLeft, user?.isAdmin, user?.email, user?.diamondBalance]);
+  }, [gameState?.isActive, gameState?.timeLeft, user?.isAdmin, user?.email, user.diamondBalance]);
 
   if (!gameState || gameState.timeLeft <= 0) return null;
 

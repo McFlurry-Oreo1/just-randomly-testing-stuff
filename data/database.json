@@ -7,9 +7,9 @@
       "firstName": "Admin",
       "lastName": "User",
       "isAdmin": true,
-      "diamondBalance": 10000,
+      "diamondBalance": 9000,
       "createdAt": "2025-11-08T00:01:43.894Z",
-      "updatedAt": "2025-11-08T00:01:43.894Z"
+      "updatedAt": "2026-01-04T21:05:02.070Z"
     },
     {
       "id": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
@@ -126,6 +126,13 @@
       "productId": "44447dbf-349f-48ed-bfc0-f2a6c691bf45",
       "status": "pending",
       "createdAt": "2026-01-04T21:00:01.197Z"
+    },
+    {
+      "id": "b718c20f-6fd2-4c4f-83ba-00901df46fa1",
+      "userId": "be34fc8f-c619-48a6-af0c-3141d3dcde70",
+      "productId": "b7b90a83-5c40-4cc7-a6f2-c21e0d858231",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:05:02.071Z"
     }
   ]
 }
