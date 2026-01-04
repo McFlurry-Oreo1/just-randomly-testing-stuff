@@ -219,6 +219,10 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Deduct diamonds and create order
       const updatedUser = await storage.adjustUserDiamonds(user.id, -product.price);
+      
+      // Update Firebase in background if possible, but mainly rely on frontend sync
+      // for this request we'll just return the updated user as before
+
       const order = await storage.createOrder({
         userId: user.id,
         productId,

@@ -172,17 +172,6 @@ export function AppSidebar() {
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </div>
             </div>
-
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-              data-testid="button-logout"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              {logoutMutation.isPending ? "Signing out..." : "Sign Out"}
-            </Button>
           </div>
         )}
       </SidebarFooter>

@@ -49,7 +49,7 @@ export function DiamondBalance({ balance, className = "", size = "md" }: Diamond
   return (
     <div className={`flex items-center gap-2 ${sizeClasses[size]} font-semibold ${className}`}>
       <DiamondIcon className={iconSizes[size]} withShimmer />
-      <span className={`gradient-text ${isAnimating ? "blur-sm" : ""} transition-all duration-200`} data-testid="text-diamond-balance">
+      <span className={`gradient-text transition-all duration-200`} data-testid="text-diamond-balance">
         {Math.floor(displayBalance).toLocaleString()}
       </span>
     </div>
