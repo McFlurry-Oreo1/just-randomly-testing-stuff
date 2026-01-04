@@ -52,7 +52,7 @@ function GameTimer() {
         if (user?.email) {
           const userDocRef = doc(db, "locked", user.email);
           await setDoc(userDocRef, {
-            diamondBalance: (user.diamondBalance || 0) + 50
+            diamondBalance: (user.diamondBalance || 0) + 30
           }, { merge: true });
         }
       }
