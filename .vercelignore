@@ -1,5 +1,0 @@
-server/
-api/
-*.ts
-!dist/public/**
-

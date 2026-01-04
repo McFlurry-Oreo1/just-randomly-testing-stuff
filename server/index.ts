@@ -1,4 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { fileDb } from "./fileStorage";
@@ -48,11 +50,78 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize database and setup routes
 (async () => {
   // Initialize file database
   await fileDb.init();
   log("File database initialized");
+
+  // Create HTTP server first
+  const server = createServer(app);
+
+  // Setup Socket.IO for WebRTC signaling
+  const io = new SocketIOServer(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  // WebRTC signaling logic
+  const streams = new Map<string, string>(); // userId -> socketId mapping
+  const adminSockets = new Set<string>();
+
+  io.on("connection", (socket) => {
+    log(`Socket connected: ${socket.id}`);
+
+    socket.on("register-streamer", (userId: string) => {
+      streams.set(userId, socket.id);
+      socket.userId = userId;
+      log(`Streamer registered: ${userId}`);
+      
+      // Notify all admins about new stream
+      adminSockets.forEach(adminId => {
+        io.to(adminId).emit("stream-available", userId);
+      });
+    });
+
+    socket.on("register-admin", () => {
+      adminSockets.add(socket.id);
+      log(`Admin registered: ${socket.id}`);
+      
+      // Send list of active streams
+      const activeStreams = Array.from(streams.keys());
+      socket.emit("active-streams", activeStreams);
+    });
+
+    socket.on("request-stream", (userId: string) => {
+      const streamerSocketId = streams.get(userId);
+      if (streamerSocketId) {
+        io.to(streamerSocketId).emit("stream-requested", socket.id);
+      }
+    });
+
+    socket.on("signal", (data: { to: string; signal: any }) => {
+      io.to(data.to).emit("signal", {
+        from: socket.id,
+        signal: data.signal
+      });
+    });
+
+    socket.on("disconnect", () => {
+      log(`Socket disconnected: ${socket.id}`);
+      
+      // Remove from streams if streamer
+      if (socket.userId) {
+        streams.delete(socket.userId);
+        adminSockets.forEach(adminId => {
+          io.to(adminId).emit("stream-unavailable", socket.userId);
+        });
+      }
+      
+      // Remove from admins
+      adminSockets.delete(socket.id);
+    });
+  });
 
   // Register API routes
   await registerRoutes(app);
@@ -64,27 +133,23 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
+
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
+  }
+
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || '5000', 10);
+  const host = process.env.HOST || 'localhost';
+  server.listen(port, host, () => {
+    log(`serving on ${host}:${port}`);
+  });
 })();
-
-// Setup server for local development (not Vercel)
-if (process.env.VERCEL !== '1') {
-  (async () => {
-    const { createServer } = await import("http");
-    const server = createServer(app);
-    
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
-
-    const port = parseInt(process.env.PORT || '5000', 10);
-    const host = process.env.HOST || 'localhost';
-    server.listen(port, host, () => {
-      log(`serving on ${host}:${port}`);
-    });
-  })();
-}
-
-// Export for Vercel serverless functions
-export default app;
