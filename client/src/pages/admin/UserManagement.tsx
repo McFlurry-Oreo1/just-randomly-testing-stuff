@@ -102,15 +102,18 @@ export default function UserManagement() {
         </div>
         <Card className="glass p-4 flex items-center gap-4">
           <div className="text-right">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Game Timer</p>
-            <p className="text-2xl font-mono font-bold">{formatTime(gameState?.timeLeft || 3600)}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Rewards</p>
+            <p className="text-2xl font-mono font-bold">{gameState?.isActive ? "ON" : "OFF"}</p>
           </div>
           <div className="flex gap-2">
-            <Button size="icon" variant={gameState?.isActive ? "destructive" : "default"} onClick={toggleGame}>
+            <Button size="icon" variant={gameState?.isActive ? "destructive" : "default"} onClick={async () => {
+              const newState = !gameState?.isActive;
+              await updateDoc(doc(db, "settings", "game"), {
+                isActive: newState,
+                lastTick: Date.now()
+              });
+            }}>
               {gameState?.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </Button>
-            <Button size="icon" variant="outline" onClick={resetGame}>
-              <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
         </Card>

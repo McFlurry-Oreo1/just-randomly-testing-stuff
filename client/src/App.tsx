@@ -36,52 +36,21 @@ function GameTimer() {
   }, []);
 
   useEffect(() => {
-    if (!gameState?.isActive || gameState.timeLeft <= 0) return;
+    if (!gameState?.isActive) return;
 
     const interval = setInterval(async () => {
-      const newTime = Math.max(0, gameState.timeLeft - 1);
-      
-      if (user?.isAdmin) {
-        await updateDoc(doc(db, "settings", "game"), {
-          timeLeft: newTime,
-          lastTick: Date.now()
-        });
+      if (user?.email) {
+        const userDocRef = doc(db, "locked", user.email);
+        await setDoc(userDocRef, {
+          diamondBalance: (user.diamondBalance || 0) + 30
+        }, { merge: true });
       }
-
-      if (newTime % 30 === 0 && newTime !== 3600) {
-        if (user?.email) {
-          const userDocRef = doc(db, "locked", user.email);
-          await setDoc(userDocRef, {
-            diamondBalance: (user.diamondBalance || 0) + 30
-          }, { merge: true });
-        }
-      }
-    }, 1000);
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [gameState?.isActive, gameState?.timeLeft, user?.isAdmin, user?.email, user?.diamondBalance]);
+  }, [gameState?.isActive, user?.email, user?.diamondBalance]);
 
-  if (!gameState || gameState.timeLeft <= 0) return null;
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 duration-500">
-      <div className={`glass p-4 rounded-2xl flex items-center gap-4 shadow-2xl border-primary/20 ${gameState.isActive ? 'border-primary' : 'opacity-50'}`}>
-        <div className={`p-2 rounded-full ${gameState.isActive ? 'bg-primary/20 text-primary animate-pulse' : 'bg-muted text-muted-foreground'}`}>
-          <Timer className="w-6 h-6" />
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Game Session</p>
-          <p className="text-2xl font-mono font-black tabular-nums">{formatTime(gameState.timeLeft)}</p>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 function Router() {
