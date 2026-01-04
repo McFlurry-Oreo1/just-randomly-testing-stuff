@@ -17,6 +17,73 @@ export default function UserManagement() {
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
   const [gameState, setGameState] = useState<any>(null);
 
+  const { data: users, isLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const adjustDiamondsMutation = useMutation({
+    mutationFn: async ({ userId, amount }: { userId: string; amount: number }) => {
+      return await apiRequest("POST", "/api/admin/adjust-diamonds", { userId, amount });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Success",
+        description: "Diamond balance adjusted successfully",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/admin/users/${userId}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "settings", "game"), (docSnap) => {
       if (docSnap.exists()) {
@@ -171,7 +238,9 @@ export default function UserManagement() {
                   type="number"
                   value={adjustments[user.id] || 0}
                   onChange={(e) => {
-                    setAdjustments({ ...adjustments, [user.id]: parseInt(e.target.value) || 0 });
+                    const value = e.target.value;
+                    const numValue = value === "" ? 0 : parseInt(value, 10);
+                    setAdjustments({ ...adjustments, [user.id]: isNaN(numValue) ? 0 : numValue });
                   }}
                   className="w-32 text-center"
                   placeholder="0"

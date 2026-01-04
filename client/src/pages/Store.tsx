@@ -1,6 +1,7 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useFirebaseProducts } from "@/hooks/useFirebaseProducts";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -19,14 +20,28 @@ export default function Store() {
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const applePayAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
-  });
+  const { products, isLoading: productsLoading } = useFirebaseProducts();
 
   const purchaseMutation = useMutation({
-    mutationFn: async (productId: string) => {
-      // First call backend to process and record in PG
-      const response = await apiRequest("POST", "/api/purchase", { productId });
+    mutationFn: async (productName: string) => {
+      // Sync Firebase balance to database before purchase
+      if (user?.diamondBalance !== undefined) {
+        try {
+          await apiRequest("POST", "/api/sync-balance", { balance: user.diamondBalance });
+        } catch (error) {
+          console.error("Failed to sync balance:", error);
+        }
+      }
+      
+      // Then call backend to process purchase (use product name and price from Firebase)
+      if (!selectedProduct) {
+        throw new Error("No product selected");
+      }
+      
+      const response = await apiRequest("POST", "/api/purchase", { 
+        productName: selectedProduct.name,
+        price: selectedProduct.price
+      });
       
       // Then sync to Firebase for instant admin visibility
       if (user?.email && selectedProduct) {
@@ -81,13 +96,16 @@ export default function Store() {
   });
 
   const handlePurchase = (product: Product) => {
+    // Reset mutation state when selecting a new product
+    purchaseMutation.reset();
     setSelectedProduct(product);
     setIsPurchaseModalOpen(true);
   };
 
   const handleConfirmPurchase = () => {
     if (selectedProduct) {
-      purchaseMutation.mutate(selectedProduct.id);
+      // Pass product name (which is the Firebase document ID) and price
+      purchaseMutation.mutate(selectedProduct.name);
     }
   };
 
@@ -110,7 +128,7 @@ export default function Store() {
     );
   }
 
-  if (!products || products.length === 0) {
+  if (products.length === 0 && !productsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center glass p-12 rounded-lg max-w-md">

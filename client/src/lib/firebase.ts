@@ -4,6 +4,7 @@ import {
   getFirestore, 
   doc, 
   getDoc, 
+  getDocs,
   setDoc, 
   onSnapshot, 
   collection, 
@@ -29,4 +30,4 @@ const app = initializeApp(firebaseConfig);
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 const db = getFirestore(app);
 
-export { app, analytics, db, doc, getDoc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, updateDoc, where };
+export { app, analytics, db, doc, getDoc, getDocs, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, updateDoc, where };

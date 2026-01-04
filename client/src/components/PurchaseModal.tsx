@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DiamondBalance } from "./DiamondBalance";
 import type { Product } from "@shared/schema";
-import { CheckCircle2, Package } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface PurchaseModalProps {
@@ -31,6 +31,13 @@ export function PurchaseModal({
   userBalance,
 }: PurchaseModalProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Reset showSuccess when modal opens with a new product or when isSuccess becomes false
+  useEffect(() => {
+    if (isOpen && !isSuccess) {
+      setShowSuccess(false);
+    }
+  }, [isOpen, isSuccess]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -70,17 +77,6 @@ export function PurchaseModal({
 
             <div className="space-y-6 py-4">
               <div className="flex items-start gap-4 p-4 glass rounded-lg">
-                <div className="w-20 h-20 bg-muted/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  {product.imageUrl ? (
-                    <img 
-                      src={product.imageUrl} 
-                      alt={product.name}
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                  ) : (
-                    <Package className="w-10 h-10 text-muted-foreground/30" />
-                  )}
-                </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
                   <DiamondBalance balance={product.price} size="sm" />

@@ -18,37 +18,39 @@ import UserManagement from "./pages/admin/UserManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
 import OrderManagement from "./pages/admin/OrderManagement";
 import CameraViewer from "./pages/admin/CameraViewer";
-import { Loader2, Timer } from "lucide-react";
-import { useEffect, useState } from "react";
-import { db, doc, onSnapshot, updateDoc, setDoc } from "@/lib/firebase";
+import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { db, doc, setDoc, getDoc } from "@/lib/firebase";
+import { apiRequest } from "@/lib/queryClient";
 
-function GameTimer() {
+function DiamondTimer() {
   const { user } = useAuth();
-  const [gameState, setGameState] = useState<any>(null);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, "settings", "game"), (docSnap) => {
-      if (docSnap.exists()) {
-        setGameState(docSnap.data());
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!gameState?.isActive) return;
+    if (!user?.email || !user?.id) return;
 
     const interval = setInterval(async () => {
-      if (user?.email) {
-        const userDocRef = doc(db, "locked", user.email);
-        await setDoc(userDocRef, {
-          diamondBalance: (user.diamondBalance || 0) + 30
-        }, { merge: true });
+      const userDocRef = doc(db, "locked", user.email);
+      // Read current balance from Firebase to avoid stale closure values
+      const userDoc = await getDoc(userDocRef);
+      const currentBalance = userDoc.exists() ? userDoc.data().diamondBalance || 0 : 0;
+      const newBalance = currentBalance + 70;
+      
+      // Update Firebase
+      await setDoc(userDocRef, {
+        diamondBalance: newBalance
+      }, { merge: true });
+      
+      // Sync to database
+      try {
+        await apiRequest("POST", "/api/sync-balance", { balance: newBalance });
+      } catch (error) {
+        console.error("Failed to sync balance to database:", error);
       }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [gameState?.isActive, user?.email, user?.diamondBalance]);
+  }, [user?.email, user?.id]);
 
   return null;
 }
@@ -109,7 +111,7 @@ function AppContent() {
       <SidebarProvider style={style as React.CSSProperties}>
         <div className="flex h-screen w-full">
           <AppSidebar />
-          <GameTimer />
+          <DiamondTimer />
           <div className="flex flex-col flex-1 overflow-hidden">
             <header className="flex items-center justify-between p-4 border-b glass sticky top-0 z-40">
               <SidebarTrigger data-testid="button-sidebar-toggle" />

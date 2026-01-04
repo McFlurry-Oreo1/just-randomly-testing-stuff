@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DiamondBalance } from "./DiamondBalance";
-import { Package, CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface OrderCardProps {
@@ -15,18 +15,6 @@ export function OrderCard({ order, showUserInfo = false }: OrderCardProps) {
   return (
     <Card className="glass p-6 hover-elevate transition-all duration-300" data-testid={`card-order-${order.id}`}>
       <div className="flex items-start gap-4">
-        <div className="w-16 h-16 bg-muted/20 rounded-lg flex items-center justify-center flex-shrink-0">
-          {order.product?.imageUrl ? (
-            <img 
-              src={order.product.imageUrl} 
-              alt={order.product.name}
-              className="w-full h-full object-cover rounded-lg"
-            />
-          ) : (
-            <Package className="w-8 h-8 text-muted-foreground/30" />
-          )}
-        </div>
-
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4 mb-2">
             <div>

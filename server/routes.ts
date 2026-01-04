@@ -190,6 +190,40 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // User: Sync balance from Firebase (for timer rewards)
+  app.post('/api/sync-balance', isAuthenticated, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { balance } = req.body;
+      if (typeof balance !== 'number') {
+        return res.status(400).json({ message: "Invalid balance" });
+      }
+
+      // Get current database balance
+      const dbUser = await storage.getUser(user.id);
+      if (!dbUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Sync Firebase balance to database
+      const difference = balance - dbUser.diamondBalance;
+      if (difference !== 0) {
+        await storage.adjustUserDiamonds(user.id, difference);
+      }
+
+      const updatedUser = await storage.getUser(user.id);
+      const { password: _, ...userWithoutPassword } = updatedUser!;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Error syncing balance:", error);
+      res.status(500).json({ message: error.message || "Failed to sync balance" });
+    }
+  });
+
   // Purchase route
   app.post('/api/purchase', isAuthenticated, async (req, res) => {
     try {
@@ -205,27 +239,47 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: validationError.message });
       }
 
-      const { productId } = parseResult.data;
+      const { productId, productName, price } = parseResult.data;
 
-      const product = await storage.getProduct(productId);
-
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
+      // Support both old productId lookup and new Firebase productName + price
+      let productPrice: number;
+      let finalProductId: string;
+      
+      if (productId) {
+        // Legacy: Look up product by ID
+        const product = await storage.getProduct(productId);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found" });
+        }
+        productPrice = product.price;
+        finalProductId = productId;
+      } else if (productName && price) {
+        // New: Use Firebase product (name is document ID)
+        productPrice = price;
+        finalProductId = productName; // Use product name as ID for orders
+      } else {
+        return res.status(400).json({ message: "Invalid product data" });
       }
 
-      if (user.diamondBalance < product.price) {
+      // Fetch fresh user data to ensure we have the latest balance
+      const freshUser = await storage.getUser(user.id);
+      if (!freshUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (freshUser.diamondBalance < productPrice) {
         return res.status(400).json({ message: "Insufficient diamonds" });
       }
 
       // Deduct diamonds and create order
-      const updatedUser = await storage.adjustUserDiamonds(user.id, -product.price);
+      const updatedUser = await storage.adjustUserDiamonds(freshUser.id, -productPrice);
       
       // Update Firebase in background if possible, but mainly rely on frontend sync
       // for this request we'll just return the updated user as before
 
       const order = await storage.createOrder({
         userId: user.id,
-        productId,
+        productId: finalProductId,
         status: "pending",
       });
 

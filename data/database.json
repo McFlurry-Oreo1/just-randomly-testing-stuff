@@ -18,9 +18,9 @@
       "firstName": "Regular",
       "lastName": "User",
       "isAdmin": false,
-      "diamondBalance": 300,
+      "diamondBalance": 360,
       "createdAt": "2025-11-08T00:01:43.977Z",
-      "updatedAt": "2026-01-04T21:23:21.485Z"
+      "updatedAt": "2026-01-04T22:14:20.449Z"
     },
     {
       "id": "81718e40-77b1-402b-a7e2-9347a39c6c8b",
@@ -32,6 +32,28 @@
       "diamondBalance": 149,
       "createdAt": "2025-11-08T00:33:43.184Z",
       "updatedAt": "2025-11-08T01:52:28.691Z"
+    },
+    {
+      "id": "348c6a7e-5083-460c-9302-59b5665e875c",
+      "email": "isaac@iscool.com",
+      "password": "$2b$10$P0XtKoyEf6nJprRUqe/1BODjEwNUC95bfxKLybx0C.qZRiNTWsdmm",
+      "firstName": "Isaac",
+      "lastName": "",
+      "isAdmin": false,
+      "diamondBalance": 1000,
+      "createdAt": "2026-01-04T22:14:28.551Z",
+      "updatedAt": "2026-01-04T22:14:28.552Z"
+    },
+    {
+      "id": "8e0bb6b7-e23e-46ca-9446-92575f0d9e5c",
+      "email": "isaac@isverycool.com",
+      "password": "$2b$10$BRt4raODBayw8wTZmJIFAujhj3I4d6TEpAt.MkVFJ0co5zbGEqYOW",
+      "firstName": "Isaac",
+      "lastName": "Lee",
+      "isAdmin": false,
+      "diamondBalance": 1000,
+      "createdAt": "2026-01-04T22:15:49.328Z",
+      "updatedAt": "2026-01-04T22:15:49.328Z"
     }
   ],
   "products": [
@@ -154,6 +176,104 @@
       "productId": "44447dbf-349f-48ed-bfc0-f2a6c691bf45",
       "status": "pending",
       "createdAt": "2026-01-04T21:23:21.486Z"
+    },
+    {
+      "id": "9f6fa423-3bfe-49a9-8c70-25a99a2bc45b",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "44447dbf-349f-48ed-bfc0-f2a6c691bf45",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:36:25.899Z"
+    },
+    {
+      "id": "5c24749f-8c34-4d39-bbb5-6870f075b84e",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "92743ad4-4c43-4d22-8547-3ef03086302e",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:36:58.665Z"
+    },
+    {
+      "id": "52a12139-2ee3-4626-8cc2-ae66e7b936b4",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "44447dbf-349f-48ed-bfc0-f2a6c691bf45",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:38:08.436Z"
+    },
+    {
+      "id": "f51fbcc1-f106-48b5-96b8-0491438503fa",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "Bathroom",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:46:11.788Z"
+    },
+    {
+      "id": "ea2b94da-3f96-4cd8-a6d7-ba1c0dfba537",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "Bathroom",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:49:17.889Z"
+    },
+    {
+      "id": "22ae1dc3-f861-4637-b3b2-d767afac4fa5",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "BOP IT easy version",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:56:14.021Z"
+    },
+    {
+      "id": "ed6311b0-7484-4d9a-a73c-6d19b1e46643",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "10 Minutes Of Tv Time",
+      "status": "pending",
+      "createdAt": "2026-01-04T21:58:36.471Z"
+    },
+    {
+      "id": "f7278fe9-e8ac-449a-8596-41d9c224fb13",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "10 Minutes Of Tv Time",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:00:29.855Z"
+    },
+    {
+      "id": "549453f7-a768-40f5-9c65-09ec19abdd2b",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "BOP IT easy version",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:00:56.823Z"
+    },
+    {
+      "id": "83f61b08-7eec-4b17-a09a-d3f55706d073",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "BOP IT easy version",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:01:08.190Z"
+    },
+    {
+      "id": "1c83481a-4a56-46f2-95bd-04e0350b9452",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "Snack",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:04:49.392Z"
+    },
+    {
+      "id": "b77cb686-22ce-40d4-b67f-86aef607f62f",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "BOP IT advanced",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:11:25.444Z"
+    },
+    {
+      "id": "78865a22-a7d1-4fbf-9131-a4f059c850ea",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "Deck of cards",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:12:00.708Z"
+    },
+    {
+      "id": "cc8dbaa6-94d0-489f-b23f-ed88869d3bf1",
+      "userId": "83f0cad9-83ea-49c8-a1a0-9dde16aeda62",
+      "productId": "Deck of cards",
+      "status": "pending",
+      "createdAt": "2026-01-04T22:12:08.128Z"
     }
   ]
 }
